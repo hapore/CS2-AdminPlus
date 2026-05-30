@@ -24,7 +24,7 @@ public partial class AdminPlus
         minutes == 0
             ? Localizer["Discord.BanLog.Permanent"].Value
             : Localizer["Duration.Temporary", minutes].Value;
-    
+
     public void CleanupBanSystem()
     {
         try
@@ -51,7 +51,7 @@ public partial class AdminPlus
         AddCommand("css_unban", "Unban a player from console", CmdUnban);
         AddCommand("css_lastban", "Show last disconnected players", CmdLastBan);
         AddCommand("css_baninfo", "Show ban info", CmdBanInfo);
-        
+
         AddCommand("css_cleanbans", "Clean all bans from console", CmdCleanBans);
         AddCommand("css_cleanipbans", "Clean all IP bans from console", CmdCleanIpBans);
         AddCommand("css_cleansteambans", "Clean all SteamID bans from console", CmdCleanSteamBans);
@@ -60,7 +60,7 @@ public partial class AdminPlus
     private void CmdBan(CCSPlayerController? caller, CommandInfo info)
     {
         bool isConsoleCommand = caller == null;
-        
+
         if (isConsoleCommand)
         {
         }
@@ -81,7 +81,7 @@ public partial class AdminPlus
         }
 
         var targetInput = info.GetArg(1);
-        
+
         var teamPlayers = GetPlayersFromTeamInput(targetInput);
         if (teamPlayers.Count > 0)
         {
@@ -89,7 +89,7 @@ public partial class AdminPlus
             return;
         }
 
-        var target = GetPlayerFromInput(targetInput, true); 
+        var target = GetPlayerFromInput(targetInput, true);
 
         if (target == null && caller != null && caller.IsValid)
         {
@@ -137,7 +137,7 @@ public partial class AdminPlus
         foreach (var target in teamPlayers)
         {
             if (target == null || !target.IsValid) continue;
-            
+
             if (caller != null && caller.IsValid && CheckImmunity(caller, target))
             {
                 if (caller.IsValid) caller.Print(Localizer["Ban.ImmunityBlockedPlayer", target.PlayerName]);
@@ -167,19 +167,20 @@ public partial class AdminPlus
         if (bannedCount > 0)
         {
             File.WriteAllLines(BannedUserPath, SteamBans.Values.Select(x => x.line));
-            
+
             string durationText = minutes == 0 ? Localizer["Duration.Forever"] : Localizer["Duration.Temporary", minutes];
             PlayerExtensions.PrintToAll(Localizer["Team.Ban.Success", executorName, teamName, durationText, reason]);
             PlayerExtensions.PrintToAll(Localizer["Team.Ban.PlayerCount", bannedCount]);
 
             LogAction($"{executorName} banned {bannedCount} players from {teamName} for {minutes} minutes. Reason: {reason}");
-            
+
             string banDurationText = FormatDiscordBanDurationMinutes(minutes);
             foreach (var target in teamPlayers)
             {
                 if (target != null && target.IsValid)
                 {
-                    AddTimer(0.1f, () => {
+                    AddTimer(0.1f, () =>
+                    {
                         _ = Discord.SendBanLog(target.PlayerName, target.SteamID.ToString(), executorName, reason, banDurationText, false, this);
                     });
                 }
@@ -257,9 +258,10 @@ public partial class AdminPlus
             PlayerExtensions.PrintToAll(Localizer["Player.Ban.Success", executorName, safeName, Localizer["Duration.Temporary", minutes], reason]);
 
         LogAction($"{executorName} banned {safeName} ({steamId}) [IP:{ip}] for {minutes} minutes. Reason: {reason}");
-        
+
         string durationText = FormatDiscordBanDurationMinutes(minutes);
-        AddTimer(0.1f, () => {
+        AddTimer(0.1f, () =>
+        {
             _ = Discord.SendBanLog(safeName, steamId, executorName, reason, durationText, false, this);
         });
     }
@@ -267,7 +269,7 @@ public partial class AdminPlus
     private void CmdIpBan(CCSPlayerController? caller, CommandInfo info)
     {
         bool isConsoleCommand = caller == null;
-        
+
         if (isConsoleCommand)
         {
         }
@@ -301,7 +303,7 @@ public partial class AdminPlus
         {
             ip = target.IpAddress;
             displayName = SanitizeName(target.PlayerName);
-            
+
             if (ip.Contains(":"))
             {
                 ip = ip.Split(':')[0];
@@ -309,9 +311,9 @@ public partial class AdminPlus
         }
         else if (target == null && !Regex.IsMatch(input, @"^\d{1,3}(\.\d{1,3}){3}$"))
         {
-            if (caller != null && caller.IsValid) 
+            if (caller != null && caller.IsValid)
                 caller.Print(Localizer["IpBan.PlayerNotFound", input]);
-            else 
+            else
                 Console.WriteLine(Localizer["IpBan.PlayerNotFoundConsole", input]);
             return;
         }
@@ -350,8 +352,9 @@ public partial class AdminPlus
             PlayerExtensions.PrintToAll(Localizer["IpBan.AddedIp", executorName, ip, reason]);
 
         LogAction($"{executorName} IP banned {displayName} ({ip}). Reason: {reason}");
-        
-        AddTimer(0.1f, () => {
+
+        AddTimer(0.1f, () =>
+        {
             _ = Discord.SendBanLog(displayName, "IP Ban", executorName, reason, Localizer["Discord.BanLog.Permanent"].Value, false, this);
         });
     }
@@ -359,7 +362,7 @@ public partial class AdminPlus
     private void CmdUnban(CCSPlayerController? caller, CommandInfo info)
     {
         bool isConsoleCommand = caller == null;
-        
+
         if (isConsoleCommand)
         {
         }
@@ -381,8 +384,12 @@ public partial class AdminPlus
 
         string key = info.GetArg(1);
         bool removed = false;
-        
-        if (!key.Contains("STEAM_") && !key.Contains("."))
+
+        // SteamID64 es un número de 17 dígitos (765611...). Si el input ya es un SteamID64
+        // o un SteamID2 (STEAM_x:y:z) o una IP (contiene "."), usarlo directamente.
+        bool isSteamId64 = key.Length >= 15 && long.TryParse(key, out _);
+
+        if (!key.Contains("STEAM_") && !key.Contains(".") && !isSteamId64)
         {
             var target = GetPlayerFromInput(key, true);
             if (target != null && target.IsValid)
@@ -398,15 +405,15 @@ public partial class AdminPlus
                 }
                 else
                 {
-                    if (caller != null && caller.IsValid) 
+                    if (caller != null && caller.IsValid)
                         caller.Print(Localizer["Unban.PlayerNotFound", key]);
-                    else 
+                    else
                         Console.WriteLine(Localizer["Unban.PlayerNotFoundConsole", key]);
                     return;
                 }
             }
         }
-        
+
         string playerName = "Unknown";
         string ip = "-";
         string reason = "Unbanned";
@@ -416,18 +423,18 @@ public partial class AdminPlus
             if (SteamBans.ContainsKey(key))
             {
                 var banInfo = SteamBans[key];
-                playerName = banInfo.nick; 
+                playerName = banInfo.nick;
                 ip = banInfo.ip;
                 reason = Localizer["Discord.BanLog.UnbanReason"].Value;
             }
             else if (IpBans.ContainsKey(key))
             {
                 var banInfo = IpBans[key];
-                playerName = banInfo.nick; 
-                ip = key; 
+                playerName = banInfo.nick;
+                ip = key;
                 reason = Localizer["Discord.BanLog.UnbanIpReason"].Value;
             }
-            
+
             if (SteamBans.Remove(key))
             {
                 File.WriteAllLines(BannedUserPath, SteamBans.Values.Select(x => x.line));
@@ -446,8 +453,9 @@ public partial class AdminPlus
         {
             PlayerExtensions.PrintToAll(Localizer["Unban.Success", executorName, key]);
             LogAction($"{executorName} unbanned {key}");
-            
-            AddTimer(0.1f, () => {
+
+            AddTimer(0.1f, () =>
+            {
                 _ = Discord.SendBanLog(playerName, key, executorName, reason, "N/A", true, this);
             });
         }
@@ -664,7 +672,7 @@ public partial class AdminPlus
         try
         {
             var path = Path.Combine(Server.GameDirectory, "csgo/addons/counterstrikesharp/configs/admins.json");
-            if (!File.Exists(path)) 
+            if (!File.Exists(path))
             {
                 LogError($"Admin file not found for ban sync: {path}");
                 return;
@@ -827,12 +835,12 @@ public partial class AdminPlus
             return Localizer["UnknownPlayer"];
 
         string cleaned = Regex.Replace(name, @"[^\w\s]", "");
-        
+
         if (cleaned.Length > 32)
             cleaned = cleaned.Substring(0, 32);
-            
+
         cleaned = cleaned.Replace(" ", "_");
-        
+
         return cleaned.Length > 0 ? cleaned : Localizer["UnknownPlayer"];
     }
 
@@ -842,10 +850,10 @@ public partial class AdminPlus
             return "Unknown";
 
         string cleaned = Regex.Replace(input, @"[""\\\n\r\t;]", "");
-        
+
         if (cleaned.Length > 64)
             cleaned = cleaned.Substring(0, 64);
-            
+
         return cleaned.Length > 0 ? cleaned : "Unknown";
     }
 
@@ -864,10 +872,10 @@ public partial class AdminPlus
         {
             steamBanCount = SteamBans.Count;
             ipBanCount = IpBans.Count;
-            
+
             SteamBans.Clear();
             IpBans.Clear();
-            
+
             File.WriteAllText(BannedUserPath, "");
             File.WriteAllText(BannedIpPath, "");
         }
@@ -876,7 +884,7 @@ public partial class AdminPlus
             caller.Print(Localizer["CleanBans.Success", steamBanCount, ipBanCount]);
         else
             Console.WriteLine(Localizer["CleanBans.Console", steamBanCount, ipBanCount]);
-            
+
         LogAction($"All bans cleared by {GetExecutorName(caller)}. SteamID: {steamBanCount}, IP: {ipBanCount}");
     }
 
@@ -901,7 +909,7 @@ public partial class AdminPlus
             caller.Print(Localizer["CleanIpBans.Success", ipBanCount]);
         else
             Console.WriteLine(Localizer["CleanIpBans.Console", ipBanCount]);
-            
+
         LogAction($"All IP bans cleared by {GetExecutorName(caller)}. Count: {ipBanCount}");
     }
 
@@ -918,7 +926,7 @@ public partial class AdminPlus
                     {
                         string steamId = match.Groups[1].Value;
                         string fullPlayerName = match.Groups[2].Value;
-                        
+
                         if (fullPlayerName.Contains(playerName, StringComparison.OrdinalIgnoreCase))
                         {
                             return steamId;
@@ -926,7 +934,7 @@ public partial class AdminPlus
                     }
                 }
             }
-            
+
             if (File.Exists(BannedIpPath))
             {
                 foreach (var line in File.ReadAllLines(BannedIpPath))
@@ -936,10 +944,10 @@ public partial class AdminPlus
                     {
                         string ip = match.Groups[1].Value;
                         string fullPlayerName = match.Groups[2].Value;
-                        
+
                         if (fullPlayerName.Contains(playerName, StringComparison.OrdinalIgnoreCase))
                         {
-                            return ip; 
+                            return ip;
                         }
                     }
                 }
@@ -949,7 +957,7 @@ public partial class AdminPlus
         {
             LogError($"finding Steam ID by name: {ex.Message}");
         }
-        
+
         return "";
     }
 
@@ -974,7 +982,7 @@ public partial class AdminPlus
             caller.Print(Localizer["CleanSteamBans.Success", steamBanCount]);
         else
             Console.WriteLine(Localizer["CleanSteamBans.Console", steamBanCount]);
-            
+
         LogAction($"All SteamID bans cleared by {GetExecutorName(caller)}. Count: {steamBanCount}");
     }
 }

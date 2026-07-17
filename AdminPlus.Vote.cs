@@ -609,6 +609,8 @@ public partial class AdminPlus
                 File.WriteAllLines(BannedUserPath, SteamBans.Values.Select(x => x.line));
             }
 
+            BanDatabase.SaveSteamBan(steamId, playerName, ip, expiry, minutes, reason, "Vote System", "");
+
             _targetPlayer.Disconnect(NetworkDisconnectionReason.NETWORK_DISCONNECT_STEAM_BANNED);
             PlayerExtensions.PrintToAll(Localizer["VoteBan.Success", _targetPlayer.PlayerName]);
             

@@ -1261,6 +1261,8 @@ public partial class AdminPlus
                         File.WriteAllLines(BannedIpPath, IpBans.Values.Select(x => x.line));
                     }
 
+                    BanDatabase.SaveIpBan(ip, safeName, reason, admin.PlayerName, admin.SteamID.ToString());
+
                     target.Disconnect(NetworkDisconnectionReason.NETWORK_DISCONNECT_STEAM_BANNED);
                     PlayerExtensions.PrintToAll(Localizer["IpBan.AddedNick", admin.PlayerName, safeName, reason]);
                     LogAction($"{admin.PlayerName} ip-banned {safeName} ({ip}). Reason: {reason}");
@@ -1277,6 +1279,8 @@ public partial class AdminPlus
                         SteamBans[steamId] = (expiry, line, safeName, ip);
                         File.WriteAllLines(BannedUserPath, SteamBans.Values.Select(x => x.line));
                     }
+
+                    BanDatabase.SaveSteamBan(steamId, safeName, ip, expiry, minutes, reason, admin.PlayerName, admin.SteamID.ToString());
 
                     target.Disconnect(NetworkDisconnectionReason.NETWORK_DISCONNECT_STEAM_BANNED);
                     if (minutes == 0)

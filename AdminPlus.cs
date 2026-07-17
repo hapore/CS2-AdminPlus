@@ -111,6 +111,8 @@ public partial class AdminPlus : BasePlugin
             BannedIpPath = Path.Combine(Server.GameDirectory, "csgo/cfg/banned_ip.cfg");
 
         LoadBans();
+        BanDatabase.LoadConfig();
+        BanDatabase.Initialize(this);
         StartCleanup();
         
         Discord.LoadConfig();
@@ -172,6 +174,7 @@ public partial class AdminPlus : BasePlugin
         {
             EnforceBan(slot);
             ScheduleBanRechecks(slot);
+            ScheduleDatabaseBanCheck(slot);
         });
 
 
@@ -801,6 +804,8 @@ public partial class AdminPlus : BasePlugin
                     }
                 }
             }
+
+            BanDatabase.RefreshCache(this, kickOnline: true);
 
             var reportCutoff = DateTime.Now.AddMinutes(-10);
             var oldGlobalCooldowns = _lastReportTime.Where(kv => kv.Value < reportCutoff).Select(kv => kv.Key).ToList();

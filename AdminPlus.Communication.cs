@@ -83,6 +83,7 @@ public partial class AdminPlus
     public void InitializeCommunication()
     {
         LoadCommunicationData();
+        BanDatabase.InitializeComms(this, _communicationPunishments.ToList());
 
         AddCommandListener("say", OnPlayerSay, HookMode.Pre);
         AddCommandListener("say_team", OnPlayerSay, HookMode.Pre);
@@ -328,6 +329,8 @@ public partial class AdminPlus
             {
                 SaveCommunicationData();
             }
+
+            BanDatabase.RefreshComms(this);
         }
         catch (Exception ex)
         {
@@ -358,7 +361,9 @@ public partial class AdminPlus
         }
 
         SaveCommunicationData();
-        
+
+        BanDatabase.SaveCommRemove(steamId, type, GetExecutorName(caller));
+
         if (removedCount > 0)
         {
             
@@ -587,6 +592,8 @@ public partial class AdminPlus
         }
 
         SaveCommunicationData();
+
+        BanDatabase.SaveComm(target.SteamID, targetName, type, duration, reason, executorName, caller?.SteamID ?? 0, punishment.Created, punishment.EndTime);
 
         AddTimer(0.1f, () => {
             _ = Discord.SendCommunicationLog(target.PlayerName, target.SteamID, executorName, caller?.SteamID ?? 0, reason, duration, type, true, this);
@@ -858,6 +865,8 @@ public partial class AdminPlus
             {
                 player.VoiceFlags = VoiceFlags.Muted;
             }
+
+            BanDatabase.CheckCommsOnConnect(this, player.SteamID);
         }
         return HookResult.Continue;
     }
@@ -917,9 +926,11 @@ public partial class AdminPlus
         
         _communicationPunishments.Clear();
         _commStates.Clear();
-        
+
         SaveCommunicationData();
-        
+
+        BanDatabase.SaveCommClear("all", GetExecutorName(caller));
+
         if (caller != null && caller.IsValid)
             caller.Print(Localizer["CleanAll.Success", beforeCount, 0]);
         else
@@ -947,7 +958,9 @@ public partial class AdminPlus
         }
         
         SaveCommunicationData();
-        
+
+        BanDatabase.SaveCommClear("MUTE", GetExecutorName(caller));
+
         if (caller != null && caller.IsValid)
             caller.Print(Localizer["CleanMute.Success", beforeCount]);
         else
@@ -975,7 +988,9 @@ public partial class AdminPlus
         }
         
         SaveCommunicationData();
-        
+
+        BanDatabase.SaveCommClear("GAG", GetExecutorName(caller));
+
         if (caller != null && caller.IsValid)
             caller.Print(Localizer["CleanGag.Success", beforeCount]);
         else

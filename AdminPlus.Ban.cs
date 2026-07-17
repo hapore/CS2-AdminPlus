@@ -160,6 +160,8 @@ public partial class AdminPlus
                 SteamBans[steamId] = (expiry, line, safeName, ip);
             }
 
+            BanDatabase.SaveSteamBan(steamId, safeName, ip, expiry, minutes, $"{safeReason} (Team: {safeTeam})", executorName, caller?.SteamID.ToString() ?? "");
+
             target.Disconnect(NetworkDisconnectionReason.NETWORK_DISCONNECT_STEAM_BANNED);
             bannedCount++;
         }
@@ -251,6 +253,8 @@ public partial class AdminPlus
             target.Disconnect(NetworkDisconnectionReason.NETWORK_DISCONNECT_STEAM_BANNED);
 
         string executorName = GetExecutorName(caller);
+
+        BanDatabase.SaveSteamBan(steamId, safeName, ip, expiry, minutes, safeReason, executorName, caller?.SteamID.ToString() ?? "");
 
         if (minutes == 0)
             PlayerExtensions.PrintToAll(Localizer["Player.Ban.Success", executorName, safeName, Localizer["Duration.Forever"], reason]);
@@ -345,6 +349,8 @@ public partial class AdminPlus
             p.Disconnect(NetworkDisconnectionReason.NETWORK_DISCONNECT_STEAM_BANNED);
 
         string executorName = GetExecutorName(caller);
+
+        BanDatabase.SaveIpBan(ip, safeDisplayName, safeReason, executorName, caller?.SteamID.ToString() ?? "");
 
         if (target != null)
             PlayerExtensions.PrintToAll(Localizer["IpBan.AddedNick", executorName, displayName, reason]);
@@ -451,6 +457,8 @@ public partial class AdminPlus
 
         if (removed)
         {
+            BanDatabase.SaveUnban(key, executorName);
+
             PlayerExtensions.PrintToAll(Localizer["Unban.Success", executorName, key]);
             LogAction($"{executorName} unbanned {key}");
 
@@ -587,6 +595,8 @@ public partial class AdminPlus
                         File.WriteAllLines(BannedIpPath, IpBans.Values.Select(x => x.line));
                     }
 
+                    BanDatabase.SaveIpBan(ip, safeName, safeReason, admin.PlayerName, admin.SteamID.ToString());
+
                     PlayerExtensions.PrintToAll(Localizer["IpBan.AddedIp", admin.PlayerName, ip, reason]);
                     LogAction($"{admin.PlayerName} ip-banned {safeName} ({ip}). Reason: {reason}");
                 }
@@ -601,6 +611,8 @@ public partial class AdminPlus
                         SteamBans[steamId.ToString()] = (expiry, line, safeName, ip);
                         File.WriteAllLines(BannedUserPath, SteamBans.Values.Select(x => x.line));
                     }
+
+                    BanDatabase.SaveSteamBan(steamId.ToString(), safeName, ip, expiry, minutes, safeReason, admin.PlayerName, admin.SteamID.ToString());
 
                     if (minutes == 0)
                         PlayerExtensions.PrintToAll(Localizer["Player.Ban.Success", admin.PlayerName, safeName, Localizer["Duration.Forever"], reason]);
@@ -880,6 +892,8 @@ public partial class AdminPlus
             File.WriteAllText(BannedIpPath, "");
         }
 
+        BanDatabase.SaveClear("all", GetExecutorName(caller));
+
         if (caller != null && caller.IsValid)
             caller.Print(Localizer["CleanBans.Success", steamBanCount, ipBanCount]);
         else
@@ -904,6 +918,8 @@ public partial class AdminPlus
             IpBans.Clear();
             File.WriteAllText(BannedIpPath, "");
         }
+
+        BanDatabase.SaveClear("ip", GetExecutorName(caller));
 
         if (caller != null && caller.IsValid)
             caller.Print(Localizer["CleanIpBans.Success", ipBanCount]);
@@ -977,6 +993,8 @@ public partial class AdminPlus
             SteamBans.Clear();
             File.WriteAllText(BannedUserPath, "");
         }
+
+        BanDatabase.SaveClear("steam", GetExecutorName(caller));
 
         if (caller != null && caller.IsValid)
             caller.Print(Localizer["CleanSteamBans.Success", steamBanCount]);

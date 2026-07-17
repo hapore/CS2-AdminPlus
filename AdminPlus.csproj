@@ -7,12 +7,17 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Platforms>x64</Platforms>
-    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <OutputPath>BuildOutput\plugins\AdminPlus\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="CounterStrikeSharp.API" Version="1.0.368" />
+    <PackageReference Include="CounterStrikeSharp.API" Version="1.0.368" ExcludeAssets="runtime" />
+    <PackageReference Include="MySqlConnector" Version="2.3.7" />
+    <!-- Provided by the CounterStrikeSharp runtime; shipping copies next to the
+         plugin breaks type identity inside the plugin load context. -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" ExcludeAssets="runtime" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="lang\*.json">

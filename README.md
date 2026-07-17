@@ -4,11 +4,12 @@
 
 > ⚠️ **Important Notice**: If you are using other admin plugins or AdminList plugins, conflicts may occur and cause errors. You should not use plugins like !calladmin and !report as they will conflict with AdminPlus. I am continuously updating the plugin and waiting for your bug reports.
 
-Advanced CounterStrikeSharp admin plugin with comprehensive features: ban/kick system, easy menu system, voting system, fun commands, communication control, and reservation system. No database required - file-based storage, easy setup.
+Advanced CounterStrikeSharp admin plugin with comprehensive features: ban/kick system, easy menu system, voting system, fun commands, communication control, and reservation system. Works out of the box with file-based storage (no database required), with **optional MySQL support** for sharing bans and mute/gag punishments across servers or managing them from a web panel.
 
 ## ✨ Features
 
 - 🔨 **Ban System**: SteamID & IP bans with temporary/permanent options
+- 🗄️ **Optional MySQL Storage**: Bans and mute/gag punishments backed by a database — multi-server sync, full history, and web panel integration (files remain as offline fallback)
 - 👥 **Admin Management**: Add/remove admins with immunity levels
 - 💬 **Communication Control**: Mute, gag, and silence players
 - 🗳️ **Voting System**: Map votes, kick votes, ban votes, and custom votes
@@ -44,6 +45,7 @@ The plugin uses file-based storage:
 - `csgo/addons/counterstrikesharp/plugins/AdminPlus/communication_data.json` - Mute/gag data
 - `csgo/addons/counterstrikesharp/plugins/AdminPlus/adminplus-discord.json` - Discord webhook configuration
 - `csgo/addons/counterstrikesharp/plugins/AdminPlus/adminplus_menu_config.json` - In-game menu key bindings (created automatically on first load)
+- `csgo/addons/counterstrikesharp/plugins/AdminPlus/adminplus-database.json` - Optional MySQL storage for bans and mute/gag punishments (created automatically on first load, disabled by default)
 
 ### 🎮 Menu configuration (`adminplus_menu_config.json`)
 
@@ -76,6 +78,86 @@ The built-in center menu reads key bindings from this file in the plugin folder.
 ```
 
 After editing the file, reload the map or restart the server so bindings apply.
+
+### 🗄️ Database configuration (`adminplus-database.json`)
+
+Optional MySQL storage for bans and communication punishments (mute/gag/silence). When disabled (default), the plugin works exactly as before using only the local files. When enabled, **the database is the source of truth** and the local files (`banned_user.cfg`, `banned_ip.cfg`, `communication_data.json`) are kept in sync automatically as an offline fallback.
+
+The file is created automatically on first load with defaults:
+
+```json
+{
+  "database": {
+    "enabled": false,
+    "host": "127.0.0.1",
+    "port": 3306,
+    "user": "root",
+    "password": "",
+    "name": "adminplus",
+    "tablePrefix": "adminplus_",
+    "serverId": "default"
+  }
+}
+```
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `enabled` | `false` | Set to `true` to enable MySQL storage |
+| `host` | `127.0.0.1` | MySQL server address |
+| `port` | `3306` | MySQL server port |
+| `user` | `root` | MySQL user |
+| `password` | *(empty)* | MySQL password |
+| `name` | `adminplus` | Database name (must exist; tables are created automatically) |
+| `tablePrefix` | `adminplus_` | Prefix for table names (`adminplus_bans`, `adminplus_comms`). Only letters, digits and `_` |
+| `serverId` | `default` | Identifier stored with each record — useful to tell servers apart in a multi-server network |
+
+**How it works:**
+- Tables are created automatically on first connect. If the tables are empty, existing bans from the cfg files and punishments from `communication_data.json` are **imported automatically** (one-time migration).
+- Every ban/unban and mute/gag/silence action is written to the database. Failed writes (database briefly down) are queued and retried automatically; the local files keep protecting the server meanwhile.
+- Every **60 seconds** the plugin marks expired records and reloads the active set from the database — records added or removed externally (e.g. from a web panel) are applied automatically, kicking/muting online players if needed.
+- On every player connect, the database is also checked directly for that player's SteamID/IP, so external bans/punishments apply immediately without waiting for the next refresh.
+- Records are never deleted: they are flagged `expired`, `unbanned` or `removed`, keeping the full history for auditing.
+
+#### Table schema: `adminplus_bans`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | `INT UNSIGNED AUTO_INCREMENT` | Primary key |
+| `type` | `ENUM('steam','ip')` | Ban type |
+| `steamid` | `VARCHAR(32) NULL` | SteamID64 (steam bans) |
+| `ip` | `VARCHAR(45) NULL` | IP address (ip bans; also stored on steam bans when known) |
+| `player_name` | `VARCHAR(128)` | Player name |
+| `admin_name` | `VARCHAR(128)` | Admin who issued the ban (`Console`, `Vote System`, `CfgImport`) |
+| `admin_steamid` | `VARCHAR(32)` | Admin SteamID64 (empty for console) |
+| `reason` | `VARCHAR(255)` | Ban reason |
+| `duration_minutes` | `INT` | Duration in minutes (`0` = permanent) |
+| `created_at` | `BIGINT` | Unix timestamp (seconds) |
+| `expires_at` | `BIGINT` | Unix timestamp (seconds), `0` = permanent |
+| `status` | `ENUM('active','expired','unbanned')` | Only `active` rows are enforced |
+| `unbanned_by` | `VARCHAR(128) NULL` | Who removed the ban (`Rebanned` when replaced by a new ban) |
+| `unbanned_at` | `BIGINT NULL` | Unix timestamp of the unban |
+| `server_id` | `VARCHAR(64)` | `serverId` of the server that created the record |
+
+#### Table schema: `adminplus_comms`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | `INT UNSIGNED AUTO_INCREMENT` | Primary key |
+| `type` | `ENUM('MUTE','GAG')` | Punishment type (silence = one `MUTE` + one `GAG` row) |
+| `steamid` | `VARCHAR(32)` | Player SteamID64 |
+| `player_name` | `VARCHAR(128)` | Player name |
+| `admin_name` | `VARCHAR(128)` | Admin who issued the punishment |
+| `admin_steamid` | `VARCHAR(32)` | Admin SteamID64 (empty for console) |
+| `reason` | `VARCHAR(255)` | Punishment reason |
+| `duration_minutes` | `INT` | Duration in minutes (`0` = permanent) |
+| `created_at` | `BIGINT` | Unix timestamp (seconds) |
+| `expires_at` | `BIGINT` | Unix timestamp (seconds), `0` = permanent |
+| `status` | `ENUM('active','expired','removed')` | Only `active` rows are enforced |
+| `removed_by` | `VARCHAR(128) NULL` | Who removed it (`Replaced` when superseded by a new punishment) |
+| `removed_at` | `BIGINT NULL` | Unix timestamp of the removal |
+| `server_id` | `VARCHAR(64)` | `serverId` of the server that created the record |
+
+**Inserting records externally (web panel / scripts):** insert with `status='active'`, `created_at` set to the current unix time and `expires_at` either `0` (permanent) or the expiry unix time. `duration_minutes` is optional for comms — if left at `0` with an `expires_at` set, the plugin derives it from `created_at` → `expires_at`. The plugin picks the record up on the player's next connect or within 60 seconds.
 
 ## 📖 Commands
 
